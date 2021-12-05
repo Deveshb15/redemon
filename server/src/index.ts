@@ -4,6 +4,7 @@ import { __prod__ } from './constants'
 // import { Post } from './entities/Post'
 import mikroConfig from './mikro-orm.config'
 import express from 'express'
+import cors from 'cors'
 import { ApolloServer } from 'apollo-server-express'
 import { buildSchema } from 'type-graphql'
 import { HelloResolver } from './resolvers/hello'
@@ -24,6 +25,22 @@ const main = async () => {
     const RedisStore = connectRedis(session)
     const redisClient = new Redis(14584, 'redis-14584.c264.ap-south-1-1.ec2.cloud.redislabs.com', {password: 'GqbU8YqB8blnJsOaEGit32oxDXOJDuFy'})
 
+    const whitelist = ['http://localhost:3000'];
+    app.use(cors({
+        origin: function (origin, callback) {
+            if (!__prod__) {
+                return callback(null, true);
+            }
+    
+            if (origin && whitelist.indexOf(origin) !== -1) {
+                callback(null, true);
+            } else {
+                callback(new Error(`${origin} : Not allowed by CORS`));
+            }
+        },
+        credentials: true,
+        })
+    )
     app.use(
         session({
             name: 'qid',
@@ -34,8 +51,8 @@ const main = async () => {
             cookie: {
                 maxAge: 1000 * 60 * 60 * 24 * 365 * 10, // 10 years
                 httpOnly: true,
-                sameSite: 'lax', // csrf
-                secure: __prod__,
+                sameSite: "none", // csrf
+                secure: true,
             },
             saveUninitialized: false,
             secret: 'deveshb',
@@ -51,7 +68,10 @@ const main = async () => {
         context: ({ req, res }): MyContext => ({ em: orm.em, req, res })
     })
     await apolloServer.start()
-    apolloServer.applyMiddleware({ app })
+    apolloServer.applyMiddleware({ 
+        app,
+        cors: false 
+    })
 
     app.listen(4000, () => {
         console.log('Server listening on port 4000')
